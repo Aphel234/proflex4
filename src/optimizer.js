@@ -184,11 +184,10 @@ export function normalizeEvent(input) {
 
 function effectiveMinimum(course, isOpen = true) {
   if (!isOpen) return 0;
-  return Math.max(
-    course.min,
-    course.mode === "Pflicht" ? 1 : 0,
-    course._gradeLimitsRelaxed ? 0 : gradeMinimumTotal(course),
-  );
+  // Nur die gesamte Kursmindestbelegung ist eine absolute Untergrenze.
+  // Jahrgangs-Minima beschreiben die gewünschte Zusammensetzung und dürfen
+  // einen Kurs weder künstlich vergrößern noch die Zuteilung blockieren.
+  return Math.max(course.min, course.mode === "Pflicht" ? 1 : 0);
 }
 
 function effectiveCohortMinimum(event, course) {
@@ -317,10 +316,10 @@ export function validateEvent(raw) {
     const gradeLimits = gradeLimitEntries(course);
     for (const limit of gradeLimits) {
       if (limit.min !== null && limit.max !== null && limit.min > limit.max) {
-        errors.push(`${course.id}: Jahrgang ${limit.grade}: Minimum ${limit.min} ist größer als Maximum ${limit.max}.`);
+        warnings.push(`${course.id}: Jahrgang ${limit.grade}: Minimum ${limit.min} ist größer als Maximum ${limit.max}. Die widersprüchlichen Zielwerte werden bestmöglich angenähert.`);
       }
-      if (!event.settings.gradeLimitsRelaxed && (limit.min ?? 0) > course.max) {
-        errors.push(`${course.id}: Jahrgang ${limit.grade}: Minimum ${limit.min} ist größer als die gesamte Maximalbelegung ${course.max}.`);
+      if ((limit.min ?? 0) > course.max) {
+        warnings.push(`${course.id}: Jahrgang ${limit.grade}: Minimum ${limit.min} ist größer als die gesamte Maximalbelegung ${course.max}. Diese Jahrgangsregel kann nur bestmöglich angenähert werden.`);
       }
       if (limit.grade < course.gradeFrom || limit.grade > course.gradeTo) {
         if ((limit.min ?? 0) > 0) warnings.push(`${course.id}: Jahrgang ${limit.grade} hat ein Minimum, liegt aber außerhalb des zugelassenen Klassenbereichs ${course.gradeFrom}–${course.gradeTo}. Diese Vorgabe wird bei Bedarf als Regelabweichung behandelt.`);
@@ -328,11 +327,8 @@ export function validateEvent(raw) {
       }
     }
     const gradeMinTotal = gradeMinimumTotal(course);
-    if (!event.settings.gradeLimitsRelaxed && gradeMinTotal > course.max) {
-      errors.push(`${course.id}: Die Jahrgangs-Minima ergeben zusammen ${gradeMinTotal}, die Maximalbelegung des Kurses ist aber nur ${course.max}.`);
-    }
-    if (!event.settings.gradeLimitsRelaxed && effectiveMinimum(course) > course.max) {
-      errors.push(`${course.id}: Die harten Mindestvorgaben ergeben mindestens ${effectiveMinimum(course)} Plätze, die Maximalbelegung ist aber nur ${course.max}.`);
+    if (gradeMinTotal > course.max) {
+      warnings.push(`${course.id}: Die Jahrgangs-Minima ergeben zusammen ${gradeMinTotal}, die Maximalbelegung des Kurses ist aber nur ${course.max}. Die Jahrgangsregeln werden bestmöglich angenähert.`);
     }
     if (course.gradeGroupRule.enabled) {
       if (course.gradeTo < 8) {
@@ -586,29 +582,9 @@ function canMeetMinimums(event, openSet, lockSet, courseMap) {
   return dinic.maxFlow(source, sink) === requiredTotal;
 }
 
-function gradeMinimumFeasibilityIssue(event, openSet, lockSet, courseMap) {
-  for (const courseId of openSet) {
-    const course = courseMap.get(courseId);
-    if (!course) continue;
-    for (const limit of gradeLimitEntries(course)) {
-      if (limit.min === null || limit.min <= 0) continue;
-      const candidates = event.participants.filter((person) =>
-        parseGrade(person.className) === limit.grade && courseEligible(person, course, lockSet, event.settings.allowOutside)
-      ).length;
-      if (candidates < limit.min) return { course, limit, candidates };
-    }
-  }
-  return null;
-}
-
 function determineOpenCourses(event, lockSet, courseMap) {
   const open = new Set(event.workshops.filter((c) => c.mode === "Pflicht").map((c) => c.id));
   for (const person of event.participants) if (person.fixed) open.add(person.fixed);
-
-  const gradeIssue = event.settings.gradeLimitsRelaxed ? null : gradeMinimumFeasibilityIssue(event, open, lockSet, courseMap);
-  if (gradeIssue) {
-    throw new Error(`${gradeIssue.course.name}${gradeIssue.course.session ? ` – Gruppe ${gradeIssue.course.session}` : ""}: Jahrgang ${gradeIssue.limit.grade} benötigt mindestens ${gradeIssue.limit.min} Schüler. Mit den aktuellen Wünschen, Sperrungen und festen Setzungen sind dafür nur ${gradeIssue.candidates} zulässige Person(en) verfügbar.`);
-  }
 
   if (!canMeetMinimums(event, open, lockSet, courseMap)) {
     throw new Error("Die Mindestbelegungen der Pflichtkurse können nicht gleichzeitig erfüllt werden. Prüfe Wünsche, Sperrungen, Klassenstufen und Bildungsgänge.");
@@ -633,8 +609,7 @@ function determineOpenCourses(event, lockSet, courseMap) {
   for (const { course } of optional) {
     const trial = new Set(open);
     trial.add(course.id);
-    const optionalGradeIssue = event.settings.gradeLimitsRelaxed ? null : gradeMinimumFeasibilityIssue(event, trial, lockSet, courseMap);
-    if (!optionalGradeIssue && canMeetMinimums(event, trial, lockSet, courseMap)) open.add(course.id);
+    if (canMeetMinimums(event, trial, lockSet, courseMap)) open.add(course.id);
   }
   return open;
 }
