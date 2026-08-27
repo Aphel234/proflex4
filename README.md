@@ -4,6 +4,12 @@ Statische Browseranwendung für bis zu **500 Teilnehmer und 30 Durchführungen**
 
 ## Neu in dieser Version
 
+### Jahrgangsregeln blockieren nicht mehr (Version 9.6.1)
+
+Jahrgangs-Minima und -Maxima sind jetzt durchgehend bestmögliche Ziele. Sie erhöhen nicht mehr indirekt die gesamte Kursmindestbelegung und lösen vor der globalen Suche keinen Abbruch mehr aus. Sind beispielsweise für ein Jahrgangsminimum von 4 nur 2 zulässige Schüler verfügbar, werden diese 2 zugeteilt und die Abweichung wird gelb ausgewiesen.
+
+Nur absolute Vorgaben dürfen weiterhin eine Berechnung verhindern: gesamte Kursmindest- und -maximalbelegung, Kurszugang, Sperrungen und feste Setzungen. Eine solche Meldung nennt nun nicht mehr fälschlich die Jahrgangsregel als Ursache.
+
 ### Gewichtung Wünsche ↔ Jahrgangsverteilung (Version 9.6)
 
 Unter **Übersicht → Einstellungen** steht jetzt ein Regler von `0 %` bis `100 %` zur Verfügung:

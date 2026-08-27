@@ -1,6 +1,6 @@
 {
   "name": "workshop-zuteilung-github-pages",
-  "version": "9.6.0",
+  "version": "9.6.1",
   "private": true,
   "type": "module",
   "description": "Statische Workshop-Zuteilung für GitHub Pages",
