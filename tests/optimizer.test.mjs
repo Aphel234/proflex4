@@ -508,6 +508,53 @@ test('Gewichtungsregler schützt bei 0 Prozent die Wünsche und bei 100 Prozent 
   assert.equal(gradesFirst.stats.gradeLimitDeviation, 0);
 });
 
+test('Unerreichbares Jahrgangsminimum bricht die Zuteilung nicht vorzeitig ab', () => {
+  const event = {
+    name: 'Schülerfirma mit weichem Jahrgangsminimum',
+    settings: { allowOutside: false, defaultMode: 'Pflicht', balanceWeight: 0, balanceThreshold: 10, cohortMin: 0, qualityMode: 'fast', gradePreferenceWeight: 100, rules: [] },
+    workshops: [
+      { id: 'SF', offerId: 'SF', name: 'Schülerfirma', session: '', gradeFrom: 10, gradeTo: 10, schoolForm: 'Alle', min: 1, max: 4, mode: 'Pflicht', cohortMin: 0,
+        gradeLimits: { '10': { min: 4, max: null } } },
+      { id: 'ALT', offerId: 'ALT', name: 'Alternative', session: '', gradeFrom: 10, gradeTo: 10, schoolForm: 'Alle', min: 1, max: 4, mode: 'Pflicht', cohortMin: 0, gradeLimits: {} },
+    ],
+    participants: [
+      { id: 'P1', firstName: 'A', lastName: '1', className: '10a', schoolForm: 'Regional', wishes: ['SF', '', '', ''], fixed: '' },
+      { id: 'P2', firstName: 'A', lastName: '2', className: '10a', schoolForm: 'Regional', wishes: ['SF', '', '', ''], fixed: '' },
+      { id: 'P3', firstName: 'B', lastName: '3', className: '10b', schoolForm: 'Regional', wishes: ['ALT', '', '', ''], fixed: '' },
+      { id: 'P4', firstName: 'B', lastName: '4', className: '10b', schoolForm: 'Regional', wishes: ['ALT', '', '', ''], fixed: '' },
+    ],
+    locks: [],
+  };
+
+  const result = optimizeEvent(event);
+  assert.equal(result.ok, true, result.errors?.join('\n'));
+  assert.equal(result.stats.unassigned, 0);
+  assert.equal(result.courseResults.find((course) => course.id === 'SF').load, 2);
+  assert.equal(result.stats.gradeLimitDeviation, 2);
+  assert.match(result.warnings.join(' '), /Schülerfirma.*Jg\. 10: 2 statt mindestens 4/i);
+});
+
+test('Nur die gesamte Kursmindestbelegung darf weiterhin blockieren', () => {
+  const event = {
+    name: 'Absolute Kursmindestbelegung',
+    settings: { allowOutside: false, defaultMode: 'Pflicht', balanceWeight: 0, balanceThreshold: 10, cohortMin: 0, qualityMode: 'fast', gradePreferenceWeight: 100, rules: [] },
+    workshops: [
+      { id: 'SF', offerId: 'SF', name: 'Schülerfirma', session: '', gradeFrom: 10, gradeTo: 10, schoolForm: 'Alle', min: 4, max: 4, mode: 'Pflicht', cohortMin: 0,
+        gradeLimits: { '10': { min: 4, max: null } } },
+    ],
+    participants: [
+      { id: 'P1', firstName: 'A', lastName: '1', className: '10a', schoolForm: 'Regional', wishes: ['SF', '', '', ''], fixed: '' },
+      { id: 'P2', firstName: 'A', lastName: '2', className: '10a', schoolForm: 'Regional', wishes: ['SF', '', '', ''], fixed: '' },
+    ],
+    locks: [],
+  };
+
+  const result = optimizeEvent(event);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(' '), /Mindestbelegungen der Pflichtkurse/i);
+  assert.doesNotMatch(result.errors.join(' '), /Jahrgang 10 benötigt/i);
+});
+
 test('Alte Projekte erhalten für den Gewichtungsregler die ausgewogene Standardstellung', () => {
   const normalized = normalizeEvent({ settings: {}, workshops: [], participants: [], locks: [] });
   assert.equal(normalized.settings.gradePreferenceWeight, 50);
