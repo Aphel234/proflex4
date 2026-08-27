@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f4e78">
+  <meta name="description" content="Lokale Workshop-Zuteilung direkt im Browser">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>Workshop-Zuteilung</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">GitHub-Pages-Version · Daten bleiben im Browser</p>
+      <h1>Workshop-Zuteilung</h1>
+    </div>
+    <div class="header-actions">
+      <span id="saveState" class="status-pill">lokal gespeichert</span>
+      <button id="optimizeBtn" class="button primary">Zuteilung berechnen</button>
+    </div>
+  </header>
+
+  <div class="privacy-banner">
+    <strong>Datenschutz:</strong> Die Anwendung überträgt keine Teilnehmerdaten an einen Server.
+  </div>
+
+  <main class="shell">
+    <aside class="sidebar">
+      <label class="field-label" for="eventName">Veranstaltung</label>
+      <input id="eventName" class="text-input" type="text" autocomplete="off">
+
+      <nav id="tabs" class="tabs" aria-label="Bereiche">
+        <button data-tab="dashboard" class="tab active">Übersicht</button>
+        <button data-tab="workshops" class="tab">Workshops</button>
+        <button data-tab="participants" class="tab">Teilnehmer</button>
+        <button data-tab="locks" class="tab">Sperrungen</button>
+        <button data-tab="results" class="tab">Ergebnis</button>
+      </nav>
+
+      <section class="side-card">
+        <h2>Daten</h2>
+        <div class="template-box">
+          <strong>Kursanwahl erfassen</strong>
+          <p>Vorlage mit den aktuell eingetragenen Workshops herunterladen, ausfüllen und danach wieder importieren.</p>
+          <button id="templateBtn" class="button full template-button">Vorlage mit aktuellen Kursarten herunterladen</button>
+        </div>
+        <button id="excelImportBtn" class="button full">Ausgefüllte Vorlage importieren</button>
+        <button id="surveyImportBtn" class="button full survey-import-button" type="button">Umfrage-Dateien importieren</button>
+        <button id="attendanceCheckBtn" class="button full attendance-check-button" type="button">Teilnahmekontrolle Umfrage</button>
+        <button id="sampleBtn" class="button full">Beispieldaten laden</button>
+        <button id="jsonExportBtn" class="button full">JSON sichern</button>
+        <button id="jsonImportBtn" class="button full">JSON laden</button>
+        <button id="excelExportBtn" class="button full">Excel exportieren</button>
+        <button id="deleteProjectBtn" class="button full danger project-delete" type="button">Aktuelles Projekt löschen</button>
+        <input id="jsonFile" type="file" accept="application/json,.json" hidden>
+        <input id="excelFile" type="file" accept=".xlsx,.xls" hidden>
+        <input id="surveyFiles" type="file" accept=".xlsx" multiple hidden>
+        <input id="attendanceFiles" type="file" accept=".xlsx" multiple hidden>
+      </section>
+
+      <section class="side-card">
+        <h2>Listen</h2>
+        <button id="coursePdfBtn" class="button full">Kurslisten als PDF-ZIP</button>
+        <button id="classPdfBtn" class="button full">Klassenlisten als PDF-ZIP</button>
+        <button id="courseDocxBtn" class="button full">Kurslisten als Word-ZIP</button>
+        <button id="classDocxBtn" class="button full">Klassenlisten als Word-ZIP</button>
+      </section>
+    </aside>
+
+    <section class="content">
+      <section id="dashboard" class="panel active-panel" data-panel="dashboard">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Status</p><h2>Übersicht</h2></div>
+        </div>
+        <div id="stats" class="stats-grid"></div>
+        <div class="grid two-col">
+          <article class="card">
+            <h3>Einstellungen</h3>
+            <div class="form-grid">
+              <label>Außerhalb der Wünsche zulassen?
+                <select id="allowOutside"><option value="false">Nein</option><option value="true">Ja</option></select>
+              </label>
+              <label>Standard für neue Kurse
+                <select id="defaultMode"><option>Pflicht</option><option>Optional</option></select>
+              </label>
+              <label>Berechnungsqualität
+                <select id="qualityMode">
+                  <option value="fast">Schnell – 1 Berechnung</option>
+                  <option value="standard" selected>Standard – 6 Varianten prüfen</option>
+                  <option value="thorough">Gründlich – 24 Varianten prüfen</option>
+                </select>
+                <small>Standard ist empfohlen. Gründlich testet mehr unterschiedliche Startreihenfolgen und behält automatisch die beste gültige Verteilung.</small>
+              </label>
+              <label class="weight-control">Priorität: Wünsche ↔ Jahrgangsverteilung
+                <input id="gradePreferenceWeight" type="range" min="0" max="100" step="10" value="50" aria-describedby="gradePreferenceWeightHelp">
+                <output id="gradePreferenceWeightOutput" for="gradePreferenceWeight">50 % · Ausgewogen</output>
+                <small id="gradePreferenceWeightHelp">0 % schützt die Wünsche maximal, 100 % sucht die bestmögliche Jahrgangsverteilung. Empfehlung: 50 %. Vollständige Zuteilung und absolute Grenzen bleiben immer vorrangig.</small>
+              </label>
+              <label>Ausgleich der Kursgrößen / Lehrerbelastung
+                <select id="balanceLevel">
+                  <option value="0">Aus – Wünsche haben allein Vorrang</option>
+                  <option value="10">Leicht – nur bei ähnlich guten Lösungen</option>
+                  <option value="50">Mittel – sichtbar gleichmäßigere große Kurse</option>
+                  <option value="100">Stark – Kursgrößen deutlich wichtiger</option>
+                </select>
+                <small>Empfehlung: Leicht oder Mittel. Kleine Kurse werden über die Schwelle unten vom Ausgleich ausgenommen.</small>
+              </label>
+              <label>Kleine Kurse bis Maximalgröße (Ausgleichsschwelle)
+                <input id="balanceThreshold" type="number" min="0" max="500" step="1">
+                <small>Empfehlung: 10–12. Kurse bis einschließlich dieses Werts erhalten bevorzugt ihre Maximalgröße als Ziel; erst die größeren Kurse werden untereinander ausgeglichen.</small>
+              </label>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Prüfung</h3>
+            <div id="validationSummary" class="message-list muted">Noch nicht geprüft.</div>
+          </article>
+        </div>
+        <details class="card advanced-card" id="rulesDetails">
+          <summary><strong>Erweiterte Zuteilungsregeln</strong> <span class="muted">optional · Standard: Bevorzugt</span></summary>
+          <p class="section-help">Regeln gelten pro stattfindender Durchführung. „Bevorzugt“ verbessert die Verteilung. „Vorrangig“ wird stärker gewichtet. Ist eine Regelkombination nicht vollständig erfüllbar, wird trotzdem die bestmögliche Zuteilung mit Hinweisen ausgegeben.</p>
+          <div class="rule-toolbar"><button id="addRuleBtn" class="button" type="button">Regel hinzufügen</button></div>
+          <div class="table-wrap"><table id="rulesTable"></table></div>
+        </details>
+        <article class="card">
+          <h3>So funktioniert die Berechnung</h3>
+          <ol class="steps">
+            <li>Die Einwahl erfolgt nach <strong>Kursarten</strong>. Mehrere Durchführungen derselben Kursart zählen als derselbe Wunsch.</li>
+            <li>Bei <strong>Standard</strong> oder <strong>Gründlich</strong> werden mehrere zulässige Startvarianten berechnet und die beste Verteilung gewählt.</li>
+            <li><strong>Wunschpriorität:</strong> Erst- und Zweitwünsche stehen im Mittelpunkt. Drittwünsche werden nur als Notlösung genutzt; Viertwünsche sind die absolute Notkategorie. Unvermeidbare Dritt-/Viertwünsche werden möglichst gleichmäßig auf die Kurse verteilt.</li>
+            <li>Pflichtkurse und feste Setzungen werden zwingend geöffnet; Mindest- und Maximalbelegungen bleiben harte Grenzen.</li>
+            <li><strong>Vollständigkeit zuerst:</strong> Kein Schüler bleibt allein zur Einhaltung einer Zusammensetzungsregel unzugeteilt. Nicht gleichzeitig erfüllbare Regeln werden mit möglichst kleiner Abweichung und konkretem Hinweis ausgegeben.</li>
+            <li><strong>Wünsche oder Jahrgangsverteilung:</strong> Mit dem Regler bestimmst du, welche vollständige Zuteilung bevorzugt wird. In Mittelstellung berücksichtigt der Solver beide Ziele gleichrangig.</li>
+            <li><strong>Jahrgangs- und Gruppenregeln:</strong> Min-/Max-Werte je Jahrgang werden bestmöglich eingehalten. Die optionale Jahrgangsgruppen-Regel prüft derzeit die Blöcke 8+9 und 10 aufwärts auf Gruppengröße 4.</li>
+            <li>Weitere Gruppenregeln können pro Klasse, Jahrgang oder Jahrgang + Bildungsgang wirken – standardmäßig <strong>Bevorzugt</strong> oder stärker gewichtet als <strong>Vorrangig</strong>.</li>
+            <li>Optionale Durchführungen dürfen entfallen, wenn ihre Mindestbelegung nicht erreichbar ist.</li>
+            <li>Kleine Kurse bis zur Ausgleichsschwelle erhalten ihre Maximalgröße als Ziel. Der Rest wird auf die größeren Kurse möglichst gleichmäßig verteilt.</li>
+          </ol>
+        </article>
+      </section>
+
+      <section class="panel" data-panel="workshops">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Maximal 30 Durchführungen</p><h2>Kursarten & Durchführungen</h2><p class="section-help">Gleiche Kursart-ID = derselbe Wunsch. Mit ＋ legst du eine weitere Gruppe derselben Kursart an. Über „Jahrgänge & Gruppen …“ stellst du Jahrgangsgrenzen und bei Bedarf die Jahrgangsgruppen-Regel ein.</p></div>
+          <button id="addWorkshopBtn" class="button">Workshop hinzufügen</button>
+        </div>
+        <div class="table-wrap"><table id="workshopsTable"></table></div>
+      </section>
+
+      <section class="panel" data-panel="participants">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Maximal 500</p><h2>Teilnehmer</h2></div>
+          <div class="inline-actions">
+            <input id="participantSearch" class="text-input compact" type="search" placeholder="Suchen …">
+            <button id="addParticipantBtn" class="button">Teilnehmer hinzufügen</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table id="participantsTable"></table></div>
+      </section>
+
+      <section class="panel" data-panel="locks">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Zusätzliche Regeln</p><h2>Sperrungen</h2></div>
+          <button id="addLockBtn" class="button">Sperrung hinzufügen</button>
+        </div>
+        <div class="table-wrap"><table id="locksTable"></table></div>
+      </section>
+
+      <section class="panel" data-panel="results">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Nach der Berechnung</p><h2>Ergebnis</h2></div>
+          <button id="optimizeBtnSecondary" class="button primary">Neu berechnen</button>
+        </div>
+        <div id="resultPlaceholder" class="empty-state">Noch keine Zuteilung berechnet.</div>
+        <div id="resultContent" hidden>
+          <div id="resultStats" class="stats-grid"></div>
+          <article class="card">
+            <h3>Kursübersicht</h3>
+            <div class="table-wrap"><table id="courseResultsTable"></table></div>
+          </article>
+          <article class="card">
+            <h3>Teilnehmerzuordnung</h3>
+            <div class="table-wrap"><table id="participantResultsTable"></table></div>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="app-footer" aria-label="Copyright">· © 2026 Oliver Richter</footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="gradeLimitsDialog" class="grade-limits-dialog">
+    <div class="grade-limits-form">
+      <div class="detail-heading">
+        <div><p class="eyebrow">Kurszusammensetzung</p><h2 id="gradeLimitsTitle">Jahrgangs- und Gruppenregeln</h2><p id="gradeLimitsSubtitle" class="section-help"></p></div>
+        <button id="gradeLimitsCancelBtn" class="button" type="button">Schließen</button>
+      </div>
+      <section class="debate-rule-card" aria-labelledby="debateRuleHeading">
+        <div>
+          <h3 id="debateRuleHeading">Jahrgangsgruppen-Regel</h3>
+          <p>Aktuelle Einstellung: Jahrgänge 8+9 und Jahrgang 10 aufwärts bilden getrennte Gruppen. Ihre jeweilige Schülerzahl soll durch 4 teilbar sein.</p>
+        </div>
+        <label class="checkbox-row"><input id="debateRuleEnabled" type="checkbox"> <span><strong>Jahrgangsgruppen-Regel aktivieren</strong><small>Bestmöglich: Bei unvermeidbarer Abweichung werden die Schüler trotzdem zugeteilt und ein Hinweis angezeigt.</small></span></label>
+        <label class="checkbox-row"><input id="debateBalanceEnabled" type="checkbox" checked> <span><strong>Beide Jahrgangsgruppen möglichst gleich groß</strong><small>Zusätzliches weiches Ziel nach Vollständigkeit und Regelabweichungen.</small></span></label>
+      </section>
+      <div class="message">Die Felder unten sind zusätzliche Min-/Max-Zielwerte pro Einzeljahrgang. Leer bedeutet keine Vorgabe. Unvermeidbare Abweichungen werden ausgewiesen, verhindern aber keine mögliche Zuteilung.</div>
+      <div class="table-wrap"><table id="gradeLimitsTable" class="grade-limits-table"></table></div>
+      <div class="grade-limits-actions"><button id="gradeLimitsSaveBtn" class="button primary" type="button">Vorgaben übernehmen</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="courseDetailDialog" class="wide-dialog">
+    <form method="dialog" class="course-detail-form">
+      <div class="detail-heading">
+        <div><p class="eyebrow">Kursdetail & Nachbearbeitung</p><h2 id="courseDetailTitle">Kurs</h2></div>
+        <button class="button" value="close">Schließen</button>
+      </div>
+      <div class="detail-nav">
+        <button id="prevCourseBtn" class="button" type="button">← Vorheriger Kurs</button>
+        <select id="courseDetailSelect"></select>
+        <button id="nextCourseBtn" class="button" type="button">Nächster Kurs →</button>
+        <button id="undoMoveBtn" class="button" type="button">↶ Rückgängig</button>
+      </div>
+      <div id="courseDetailStats" class="stats-grid compact-stats"></div>
+      <div id="courseRuleSummary" class="rule-summary"></div>
+      <div class="detail-tabs">
+        <button type="button" class="detail-tab active" data-detail-tab="assigned">Zugeordnet</button>
+        <button type="button" class="detail-tab" data-detail-tab="applicants">Alle Anwähler</button>
+        <button type="button" class="detail-tab" data-detail-tab="swaps">Tauschvorschläge</button>
+      </div>
+      <div id="courseDetailBody"></div>
+    </form>
+  </dialog>
+
+  <dialog id="surveyImportDialog" class="wide-dialog survey-import-dialog">
+    <div class="survey-import-form">
+      <div class="detail-heading">
+        <div><p class="eyebrow">Mehrfach-Umfrageimport</p><h2>Umfrage-Dateien prüfen</h2><p class="section-help">Kursangebote werden direkt aus den Wunschspalten erkannt. Vorhandene Kursarten werden automatisch abgeglichen; nur unklare Namen, neue Angebote ohne eindeutige Kennung und mögliche Dubletten müssen geprüft werden.</p></div>
+        <button class="button" type="button" onclick="document.querySelector('#surveyImportDialog').close()">Schließen</button>
+      </div>
+      <div id="surveyImportSummary" class="stats-grid compact-stats"></div>
+      <div id="surveyImportIssues" class="message-list"></div>
+      <section class="survey-review-section">
+        <h3>Workshop-Zuordnungen</h3>
+        <p class="section-help">Die Kursarten des aktuellen Projekts sind die Referenz. „Neue Kursart anlegen“ muss ausdrücklich ausgewählt werden.</p>
+        <div class="table-wrap"><table id="surveyMappingTable" class="survey-review-table"></table></div>
+      </section>
+      <section id="surveyDuplicateSection" class="survey-review-section" hidden>
+        <h3>Mögliche Dubletten</h3>
+        <p class="section-help">Erkennung über Vorname + Nachname + Klasse. Vorhandene Personen werden standardmäßig nicht doppelt übernommen.</p>
+        <div class="table-wrap"><table id="surveyDuplicateTable" class="survey-review-table"></table></div>
+      </section>
+      <div id="surveyImportBody"></div>
+      <div class="survey-import-actions">
+        <button class="button" type="button" onclick="document.querySelector('#surveyImportDialog').close()">Abbrechen</button>
+        <button id="surveyApplyBtn" class="button primary" type="button">Teilnehmer übernehmen</button>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog id="attendanceDialog" class="wide-dialog attendance-dialog">
+    <div class="attendance-form">
+      <div class="detail-heading">
+        <div><p class="eyebrow">Teilnahmekontrolle Umfrage</p><h2>Soll-Liste mit Umfrageteilnehmern abgleichen</h2><p class="section-help">Minimal erforderlich: Vorname | Nachname/Name | Klasse. Übliche Varianten wie Familienname, Vorname(n), Kl. oder Klassenbezeichnung werden automatisch erkannt. Die Klasse wird bei jeder Person sichtbar angezeigt. Kleine Schreibabweichungen werden zur Prüfung vorgeschlagen.</p></div>
+        <button id="attendanceCloseBtn" class="button" type="button">Schließen</button>
+      </div>
+      <div id="attendanceSummary" class="stats-grid compact-stats"></div>
+      <div id="attendanceIssues" class="message-list"></div>
+      <div class="attendance-toolbar">
+        <label>Status anzeigen
+          <select id="attendanceFilter">
+            <option value="missing">Fehlt</option>
+            <option value="review">Zu prüfen</option>
+            <option value="matched">Teilgenommen</option>
+            <option value="extra">Nur in Umfrage/Teilnehmerliste</option>
+            <option value="duplicates">Doppelte Eingaben</option>
+            <option value="all">Alle</option>
+          </select>
+        </label>
+        <button id="attendanceExportMissingBtn" class="button" type="button">Fehlende als Excel exportieren</button>
+      </div>
+      <div class="table-wrap"><table id="attendanceTable" class="attendance-table"></table></div>
+      <p class="section-help attendance-footnote">Hinweis: Als „teilgenommen“ gelten die aktuell in der Anwendung vorhandenen Teilnehmer. Exakte Dubletten und sehr ähnliche Namen derselben Klasse werden gesondert markiert.</p>
+    </div>
+  </dialog>
+
+  <dialog id="messageDialog">
+    <form method="dialog">
+      <h2 id="dialogTitle">Hinweis</h2>
+      <div id="dialogBody" class="message-list"></div>
+      <button class="button primary" value="close">Schließen</button>
+    </form>
+  </dialog>
+
+  <script src="assets/app.js" defer></script>
+  <script src="assets/jszip.min.js" defer></script>
+  <script src="assets/xlsx-import-fix.js" defer></script>
+  <script src="assets/survey-import.js" defer></script>
+  <script src="assets/table-sort.js" defer></script>
+  <script src="assets/attendance-check.js" defer></script>
+</body>
+</html>

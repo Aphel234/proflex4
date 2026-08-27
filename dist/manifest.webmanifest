@@ -1,0 +1,10 @@
+{
+  "name": "Workshop-Zuteilung",
+  "short_name": "Zuteilung",
+  "description": "Workshop-Zuteilung direkt im Browser",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#1f4e78",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
